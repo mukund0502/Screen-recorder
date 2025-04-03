@@ -23,17 +23,16 @@ CHANNELS = 1
 RATE = 44100
 audio = pyaudio.PyAudio()
 CHUNK = 512
-RECORD_SECONDS = 20
-stop_rec = False
+record_seconds = 20
 
 def fetch_frames (stopper, results):
-    global frames_list, RECORD_SECONDS, fps, screen_siz
+    global frames_list, record_seconds, fps, screen_siz, images_to_make_video
     print('Frames recording started...')
     start_taking_ss = time.time()
     got_image_for_seconds = 0
     images_to_make_video = []
     with mss.mss() as sct:
-        while got_image_for_seconds < RECORD_SECONDS:
+        while got_image_for_seconds < record_seconds:
             if stopper.value:
                 break
             frame = np.array(sct.grab(screen_size))
@@ -60,7 +59,7 @@ def fetch_frames (stopper, results):
 
 
 def fetch_audio(stopper, results):
-    global audio_bytes, audio, stop_rec
+    global audio_bytes, audio, stop_rec, Recordframes
     stream = audio.open(format=FORMAT, 
                         channels=CHANNELS, 
                         rate=RATE, 
@@ -71,7 +70,7 @@ def fetch_audio(stopper, results):
     Recordframes = []
     print('Audio recording started...')
     i = 0
-    while(i < math.ceil(RATE / CHUNK * RECORD_SECONDS)):
+    while(i < math.ceil(RATE / CHUNK * record_seconds)):
         data = stream.read(CHUNK)
         Recordframes.append(data)
         i+=1
@@ -94,6 +93,24 @@ def start_counter(stopper):
         time.sleep(1)
         i += 1
 
+def wait_and_save(results):
+    while(True):
+        if 'audio_bytes' in results and 'frames_list' in results:
+            print(results.keys())
+            clip = moviepy.video.io.ImageSequenceClip.ImageSequenceClip(results['frames_list'], fps = fps)
+            waveFile = wave.open('temp.wav', 'wb')
+            waveFile.setnchannels (CHANNELS)
+            waveFile.setsampwidth(audio.get_sample_size(FORMAT))
+            waveFile.setframerate(RATE)
+            waveFile.writeframes (results['audio_bytes'])
+            waveFile.close()
+            audio_clip = moviepy.audio.io.AudioFileClip.AudioFileClip('temp.wav') 
+            clip.audio = audio_clip
+            clip.write_videofile('my_video.mp4')
+            break
+        print('waiting')
+        time.sleep(0.1)
+
 def record():
     global process  # Use a global variable to track the process
     print("Button 1 clicked")
@@ -101,19 +118,15 @@ def record():
     button2.config(state=tk.NORMAL)
 
     stopper.value = False  # Reset stopper before starting
-    with Manager() as manager:
-        results = manager.dict()
-        frames_record = multiprocessing.Process(target=fetch_frames, daemon=True, args=(stopper,results,))
-        audio_record = multiprocessing.Process(target=fetch_audio, daemon=True, args=(stopper,results,))
-        frames_record.start()
-        audio_record.start()
-        
-        # while(True):
-        #     if 'audio_bytes' in results and 'frames_list' in results:
-        #         print(results.keys())
-        #         break
-        #     print('waiting')
-        #     time.sleep(1)
+
+    frames_record = multiprocessing.Process(target=fetch_frames, daemon=True, args=(stopper,results,))
+    audio_record = multiprocessing.Process(target=fetch_audio, daemon=True, args=(stopper,results,))
+    frames_record.start()
+    audio_record.start()
+    waiting_n_saving = multiprocessing.Process(target=wait_and_save, daemon=True, args=(results,))
+    waiting_n_saving.start()
+
+    
 
 
 
