@@ -83,20 +83,10 @@ def fetch_audio(stopper, results):
     results['audio_bytes'] = b''.join(Recordframes)
 
 
-def start_counter(stopper):
-    i = 0
-    while True:
-        if stopper.value:  
-            print('breaked loop')
-            break
-        print(i)
-        time.sleep(1)
-        i += 1
-
 def wait_and_save(results):
     while(True):
         if 'audio_bytes' in results and 'frames_list' in results:
-            print(results.keys())
+            # print(results.keys())
             clip = moviepy.video.io.ImageSequenceClip.ImageSequenceClip(results['frames_list'], fps = fps)
             waveFile = wave.open('temp.wav', 'wb')
             waveFile.setnchannels (CHANNELS)
@@ -108,57 +98,47 @@ def wait_and_save(results):
             clip.audio = audio_clip
             clip.write_videofile('my_video.mp4')
             break
-        print('waiting')
         time.sleep(0.1)
 
 def record():
     global process  # Use a global variable to track the process
-    print("Button 1 clicked")
-    button1.config(state=tk.DISABLED)
-    button2.config(state=tk.NORMAL)
 
     stopper.value = False  # Reset stopper before starting
-
+    results.clear()
     frames_record = multiprocessing.Process(target=fetch_frames, daemon=True, args=(stopper,results,))
     audio_record = multiprocessing.Process(target=fetch_audio, daemon=True, args=(stopper,results,))
     frames_record.start()
     audio_record.start()
     waiting_n_saving = multiprocessing.Process(target=wait_and_save, daemon=True, args=(results,))
     waiting_n_saving.start()
-
     
-
-
-
+    button1.config(state=tk.DISABLED)
+    button2.config(state=tk.NORMAL)
 
 
 def stop():
     global stopper
     stopper.value = True  # Signal the process to stop
-    print("Button 2 clicked")
     button2.config(state=tk.DISABLED)
     button1.config(state=tk.NORMAL)
 
 
 
 if __name__ == '__main__':
-    # Create a multiprocessing manager and stopper
     manager = multiprocessing.Manager()
     stopper = manager.Value('b', False)  # 'b' for boolean
     results = manager.dict()
-    # Create main window
     root = tk.Tk()
     root.title("Recorder")
 
-    # Create a frame to hold the buttons
     frame = tk.Frame(root)
     frame.pack(pady=20, padx=20)
+    play_ = tk.PhotoImage(file='play.png')
+    stop_ = tk.PhotoImage(file='stop.png')
 
-    # Create buttons
-    button1 = tk.Button(frame, text="record", command=record, padx=15, pady=10, state=tk.NORMAL)
-    button2 = tk.Button(frame, text="stop", command=stop, padx=15, pady=10, state=tk.DISABLED)
+    button1 = tk.Button(frame, text="record", command=record, padx=15, pady=10, state=tk.NORMAL, borderwidth=5, image=play_)
+    button2 = tk.Button(frame, text="stop", command=stop, padx=15, pady=10, state=tk.DISABLED, borderwidth=5, image=stop_)
 
-    # Pack buttons one below the other
     button1.pack(side=tk.LEFT, pady=5)
     button2.pack(side=tk.RIGHT, pady=5)
 
